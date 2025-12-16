@@ -25,11 +25,5 @@ jobs:
 
         name: 'Release to NPM'
         needs: [pr_checks, bump]
-        runs-on: ubuntu-latest
-        if: ${{ !contains(github.event.head_commit.message, '#skip-release') }}
-        steps:
-            -   name: 'Authenticate with NPM'
-                run: echo -e "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > .npmrc
-
-            -   name: 'Publishing package'
-                run: npm publish --no-git-checks --access public
+        uses: juicyllama/helpful-github-actions/.github/workflows/release-npm.yml@main
+        secrets: inherit
