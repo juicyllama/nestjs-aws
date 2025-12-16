@@ -1,10 +1,9 @@
-import { Injectable, OnModuleInit } from '@nestjs/common'
 import { AwsS3Format, AwsS3Service } from '../modules/s3'
 import { Logger } from '@juicyllama/utils'
+import { Injectable, OnModuleInit } from '@nestjs/common'
 
 @Injectable()
 export class SandboxS3Service implements OnModuleInit {
-
 	constructor(
 		private readonly awsS3Service: AwsS3Service,
 		private readonly logger: Logger,
@@ -14,7 +13,7 @@ export class SandboxS3Service implements OnModuleInit {
 		this.logger.log('SandboxService has been initialized.', {
 			context: ['SandboxService', 'onModuleInit'],
 		})
-		
+
 		// 1. Download a random image from Unsplash
 		const imageUrl = 'https://placehold.co/400x400/png'
 		this.logger.log(`Downloading image from: ${imageUrl}`)
@@ -25,26 +24,25 @@ export class SandboxS3Service implements OnModuleInit {
 			return
 		}
 		this.logger.log(`Image downloaded successfully: ${image.url}`)
-		
 
 		// 2. Upload the image to S3
-		
+
 		const buffer = Buffer.from(await image.arrayBuffer())
 
 		const uploadResult = await this.awsS3Service.create({
 			location: 'sandbox/400x400-image.png',
 			file: buffer,
 		})
-		this.logger.log(`Image uploaded to S3: ${uploadResult}`, {
+		this.logger.log(`Image uploaded to S3`, {
 			context: ['SandboxService', 'onModuleInit'],
-			params: { uploadResult }
+			params: { uploadResult },
 		})
 
 		// 3. Retrieve the image from S3
-		const s3Object = await this.awsS3Service.findOne({
+		const s3Object = (await this.awsS3Service.findOne({
 			location: 'sandbox/400x400-image.png',
-			format: AwsS3Format.Express_Multer_File
-		}) as Express.Multer.File
+			format: AwsS3Format.Express_Multer_File,
+		})) as Express.Multer.File
 
 		let imageBuffer: Buffer
 		if (s3Object && Buffer.isBuffer(s3Object.buffer)) {
@@ -62,6 +60,5 @@ export class SandboxS3Service implements OnModuleInit {
 			location: 'sandbox/400x400-image.png',
 		})
 		this.logger.log('Deleted image from S3: sandbox/400x400-image.png')
-
 	}
 }

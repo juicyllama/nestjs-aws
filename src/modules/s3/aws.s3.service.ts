@@ -1,4 +1,9 @@
+import { InjectConfig } from '../../config/config.provider'
+import { InjectS3 } from './aws.s3.constants'
+import { AwsS3Format } from './aws.s3.enums'
+import { AwsS3ConfigDto } from './config/aws.s3.config.dto'
 import {
+	CompleteMultipartUploadCommandOutput,
 	DeleteObjectCommand,
 	GetObjectCommand,
 	ListObjectsCommand,
@@ -7,21 +12,17 @@ import {
 	ServiceInputTypes,
 	ServiceOutputTypes,
 } from '@aws-sdk/client-s3'
-import { getSignedUrl, S3RequestPresigner } from '@aws-sdk/s3-request-presigner'
+import { Hash } from '@aws-sdk/hash-node'
 import { Upload, Configuration } from '@aws-sdk/lib-storage'
+import { HttpRequest } from '@aws-sdk/protocol-http'
+import { getSignedUrl, S3RequestPresigner } from '@aws-sdk/s3-request-presigner'
+import { MiddlewareStack, SourceData } from '@aws-sdk/types'
+import { parseUrl } from '@aws-sdk/url-parser'
+import { formatUrl } from '@aws-sdk/util-format-url'
+import { Logger } from '@juicyllama/utils'
+import { Injectable } from '@nestjs/common'
 import { getApplyMd5BodyChecksumPlugin } from '@smithy/middleware-apply-body-checksum'
 import { Readable } from 'stream'
-import { InjectS3 } from './aws.s3.constants'
-import { AwsS3Format } from './aws.s3.enums'
-import { AwsS3ConfigDto } from './config/aws.s3.config.dto'
-import { Injectable } from '@nestjs/common'
-import { Logger } from '@juicyllama/utils'
-import { HttpRequest } from '@aws-sdk/protocol-http'
-import { parseUrl } from '@aws-sdk/url-parser'
-import { Hash } from '@aws-sdk/hash-node'
-import { formatUrl } from '@aws-sdk/util-format-url'
-import { MiddlewareStack } from '@aws-sdk/types';
-import { InjectConfig } from '../../config/config.provider'
 
 function streamToString(stream: Readable): Promise<string> {
 	return new Promise((resolve, reject) => {
@@ -30,6 +31,12 @@ function streamToString(stream: Readable): Promise<string> {
 		stream.on('end', () => resolve(Buffer.concat(chunks).toString('utf-8')))
 		stream.on('error', (error: Error) => reject(error))
 	})
+}
+
+class Sha256Hash extends Hash {
+	constructor(secret?: SourceData) {
+		super('sha256', secret)
+	}
 }
 
 @Injectable()
@@ -54,14 +61,12 @@ export class AwsS3Service {
 	async create(options: {
 		location: string
 		format?: AwsS3Format
-		file: any
-		params?: PutObjectCommandInput
+		file: Express.Multer.File | string | Buffer | ArrayBuffer
 		sizing?: Configuration
-	}): Promise<any> {
-
+	}): Promise<CompleteMultipartUploadCommandOutput> {
 		this.logger.debug(`Create: ${options.location}`, {
 			context: ['AwsS3Service', 'create'],
-			params: options
+			params: options,
 		})
 
 		if (options.format) {
@@ -78,14 +83,12 @@ export class AwsS3Service {
 		}
 
 		try {
-			this.s3Client.middlewareStack.use(getApplyMd5BodyChecksumPlugin(this.s3Client.config) as any as MiddlewareStack<ServiceInputTypes, ServiceOutputTypes>);
-			
-			const params = {
-				Bucket: this.s3Config.AWS_S3_BUCKET_NAME,
-				Key: options.location,
-				Body: options.file,
-				...options.params,
-			}
+			this.s3Client.middlewareStack.use(
+				getApplyMd5BodyChecksumPlugin(this.s3Client.config) as any as MiddlewareStack<
+					ServiceInputTypes,
+					ServiceOutputTypes
+				>,
+			)
 
 			if (!options.sizing) {
 				options.sizing = <Configuration>{
@@ -97,30 +100,35 @@ export class AwsS3Service {
 
 			const upload = new Upload({
 				client: this.s3Client,
-				params,			
-				...options.sizing,
+				params: <PutObjectCommandInput>{
+					Bucket: this.s3Config.AWS_S3_BUCKET_NAME,
+					Key: options.location,
+					Body: options.file,
+					...options.sizing,
+				},
 			})
 
 			upload.on('httpUploadProgress', progress => {
 				this.logger.debug(`Progress`, {
 					context: ['AwsS3Service', 'create', 'httpUploadProgress'],
 					params: {
-						progress
-					}
+						progress,
+					},
 				})
 			})
 
 			return await upload.done()
-		} catch (e: any) {
+		} catch (err) {
+			const e = err as Error
 			this.logger.error(e.message, {
 				context: ['AwsS3Service', 'create'],
 				params: {
 					options,
-					error: e
-				}
+					error: e,
+				},
 			})
 
-			throw Error(e)
+			throw Error(e.message)
 		}
 	}
 
@@ -134,12 +142,11 @@ export class AwsS3Service {
 	 */
 
 	async findAll(options: { location: string }): Promise<any> {
-		
 		this.logger.debug(`Find all: ${options.location}`, {
 			context: ['AwsS3Service', 'findAll'],
-			params: options
+			params: options,
 		})
-		
+
 		const command = new ListObjectsCommand({
 			Bucket: this.s3Config.AWS_S3_BUCKET_NAME,
 			Prefix: options.location,
@@ -155,8 +162,8 @@ export class AwsS3Service {
 					this.logger.warn(`No file name found`, {
 						context: ['AwsS3Service', 'findAll'],
 						params: {
-							file
-						}
+							file,
+						},
 					})
 					continue
 				}
@@ -168,8 +175,8 @@ export class AwsS3Service {
 		this.logger.debug(`Find all: ${options.location} - ${files.length} files found`, {
 			context: ['AwsS3Service', 'findAll'],
 			params: {
-				files
-			}
+				files,
+			},
 		})
 		return files
 	}
@@ -188,10 +195,9 @@ export class AwsS3Service {
 		location: string
 		format: AwsS3Format
 	}): Promise<Express.Multer.File | string | undefined> {
-	
 		this.logger.debug(`Find one: ${options.location}`, {
 			context: ['AwsS3Service', 'findOne'],
-			params: options
+			params: options,
 		})
 
 		const command = new GetObjectCommand({
@@ -208,25 +214,26 @@ export class AwsS3Service {
 			} else {
 				throw new Error('No body found in response')
 			}
-		} catch (e: any) {
+		} catch (err) {
+			const e = err as Error
 			this.logger.error(e.message, {
 				context: ['AwsS3Service', 'findOne'],
 				params: {
 					options,
-					error: e
-				}
+					error: e,
+				},
 			})
-			throw Error(e)
+			throw Error(e.message)
 		}
 
 		if (!result) {
 			this.logger.warn(`No file found`, {
 				context: ['AwsS3Service', 'findOne'],
 				params: {
-					options
-				}
+					options,
+				},
 			})
-			return
+			return undefined
 		}
 
 		if (options.format) {
@@ -235,37 +242,34 @@ export class AwsS3Service {
 					const fileName = options.location.split('/').pop() ?? 'unknown'
 					const file: Express.Multer.File = {
 						originalname: fileName,
-						buffer: Buffer.from(result),
+						buffer: Buffer.from(result as string),
 						fieldname: fileName,
-						size: Buffer.byteLength(result),
+						size: Buffer.byteLength(result as string),
 						encoding: '7bit',
 						mimetype: 'application/octet-stream',
 						destination: '',
 						filename: fileName,
-						stream: Readable.from(result),
+						stream: Readable.from(result as string),
 						path: '',
 					}
-					result = file
-					break
+					return file
 				}
 				case AwsS3Format.JSON:
 					try {
-						result = JSON.parse(result.toString())
+						result = JSON.parse((result as string).toString()) as unknown
+						return result as string
 					} catch (err) {
 						const e = err as Error
 						this.logger.error(e.message, {
 							context: ['AwsS3Service', 'findOne'],
 							params: {
 								error: e,
-							}
+							},
 						})
 						throw e
 					}
-					break
 			}
 		}
-
-		return result
 	}
 
 	/**
@@ -279,10 +283,9 @@ export class AwsS3Service {
 	 */
 
 	async getSignedFileUrl(options: { location: string; expiresIn: number }): Promise<string> {
-
 		this.logger.debug(`Get signed URL`, {
 			context: ['AwsS3Service', 'getSignedFileUrl'],
-			params: options
+			params: options,
 		})
 
 		const command = new GetObjectCommand({
@@ -291,12 +294,12 @@ export class AwsS3Service {
 		})
 
 		const url = await getSignedUrl(this.s3Client, command, { expiresIn: options.expiresIn ?? 3600 })
-		
+
 		this.logger.debug(`Signed URL generated`, {
 			context: ['AwsS3Service', 'getSignedFileUrl'],
 			params: {
-				url
-			}
+				url,
+			},
 		})
 		return url
 	}
@@ -311,17 +314,16 @@ export class AwsS3Service {
 	 */
 
 	async getSignedUrl(options: { url: string; expiresIn: number }): Promise<string> {
-
 		this.logger.debug(`Get signed URL for ${options.url}`, {
 			context: ['AwsS3Service', 'getSignedUrl'],
-			params: options
+			params: options,
 		})
 
 		const s3ObjectUrl = parseUrl(options.url)
 		const presigner = new S3RequestPresigner({
 			credentials: this.s3Client.config.credentials,
 			region: this.s3Client.config.region,
-			sha256: Hash.bind(null, 'sha256'),
+			sha256: Sha256Hash,
 		})
 
 		// Create a GET request from S3 url.
@@ -329,8 +331,8 @@ export class AwsS3Service {
 		this.logger.debug(`Result: ${formatUrl(result)}`, {
 			context: ['AwsS3Service', 'getSignedUrl'],
 			params: {
-				result: formatUrl(result)
-			}
+				result: formatUrl(result),
+			},
 		})
 		return formatUrl(result)
 	}
@@ -345,10 +347,9 @@ export class AwsS3Service {
 	 */
 
 	async remove(options: { location: string }): Promise<any> {
-		
 		this.logger.debug(`Delete: ${options.location}`, {
 			context: ['AwsS3Service', 'remove'],
-			params: options
+			params: options,
 		})
 
 		const command = new DeleteObjectCommand({
@@ -358,5 +359,4 @@ export class AwsS3Service {
 
 		return await this.s3Client.send(command)
 	}
-
 }

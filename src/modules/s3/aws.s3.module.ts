@@ -1,12 +1,12 @@
-import { S3Client as AWSS3Client } from '@aws-sdk/client-s3'
-import { Logger } from '@juicyllama/utils'
-import { Module } from '@nestjs/common'
+import { ConfigValidationModule } from '../../config/config.module'
+import { getConfigToken } from '../../config/config.provider'
 import { AWS_DEFAULT_REGION, AwsConfigDto } from '../aws.config.dto'
 import { S3Client } from './aws.s3.constants'
 import { AwsS3Service } from './aws.s3.service'
 import { AwsS3ConfigDto } from './config/aws.s3.config.dto'
-import { getConfigToken } from '../../config/config.provider'
-import { ConfigValidationModule } from '../../config/config.module'
+import { S3Client as AWSS3Client } from '@aws-sdk/client-s3'
+import { Logger } from '@juicyllama/utils'
+import { Module } from '@nestjs/common'
 
 @Module({
 	imports: [ConfigValidationModule.register(AwsS3ConfigDto), ConfigValidationModule.register(AwsConfigDto)],
@@ -14,11 +14,11 @@ import { ConfigValidationModule } from '../../config/config.module'
 	providers: [
 		AwsS3Service,
 		{
-            provide: Logger,
-            useFactory: () => {
-                return new Logger(['@juicyllama/nestjs-aws', 'AwsS3Module'])
-            },
-        },
+			provide: Logger,
+			useFactory: () => {
+				return new Logger(['@juicyllama/nestjs-aws', 'AwsS3Module'])
+			},
+		},
 		{
 			provide: S3Client,
 			inject: [getConfigToken(AwsS3ConfigDto), getConfigToken(AwsConfigDto)],
