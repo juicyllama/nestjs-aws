@@ -1,0 +1,22 @@
+name: 'Release Package'
+
+on:
+    push:
+        branches:
+            - main
+    workflow_dispatch:
+
+jobs:
+
+    pr_checks:
+        uses: juicyllama/helpful-github-actions/.github/workflows/pr.yml@main
+        secrets: inherit
+
+    bump:
+        name: 'Bump Version'
+        needs: pr_checks
+        if: ${{ !contains(github.event.head_commit.message, '#skip-bump') }}
+        uses: juicyllama/helpful-github-actions/.github/workflows/bump.yml@main
+        with:
+            commit_message: ${{ github.event.head_commit.message }}
+        secrets: inherit

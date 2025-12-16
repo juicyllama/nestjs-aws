@@ -1,0 +1,11 @@
+name: PR Checks
+
+on:
+    pull_request:
+    workflow_dispatch:
+    workflow_call:
+
+jobs:
+    pr_checks:
+        uses: juicyllama/helpful-github-actions/.github/workflows/pr.yml@main
+        secrets: inherit
