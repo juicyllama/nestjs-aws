@@ -19,7 +19,7 @@ npm i @juicyllama/nestjs-aws
 
 ## Usage
 
-1. Add AWS Credentials to your env file
+1. Add AWS Credentials to your env file (required for all services)
 
 ```bash
 # .env
@@ -27,6 +27,6 @@ AWS_ACCESS_KEY_ID=
 AWS_SECRET_ACCESS_KEY=
 ```
 
-### Basic Usage
+### S3
 
-- AWS 
+TODO: Instructions for setting up and using S3
