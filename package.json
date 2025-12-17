@@ -8,9 +8,9 @@
     },
     "repository": {
         "type": "git",
-        "url": "https://github.com/juicyllama/nestjs-aweber"
+        "url": "https://github.com/juicyllama/nestjs-aws"
     },
-    "bugs": "https://github.com/juicyllama/nestjs-aweber/issues",
+    "bugs": "https://github.com/juicyllama/nestjs-aws/issues",
     "license": "0BSD",
     "readmeFilename": "README.md",
     "main": "dist/index.js",

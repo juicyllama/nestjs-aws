@@ -61,7 +61,7 @@ export class AwsS3Service {
 	async create(options: {
 		location: string
 		format?: AwsS3Format
-		file: Express.Multer.File | string | Buffer | ArrayBuffer
+		file: Express.Multer.File | string | Buffer | ArrayBuffer | Readable
 		sizing?: Configuration
 	}): Promise<CompleteMultipartUploadCommandOutput> {
 		this.logger.debug(`Create: ${options.location}`, {
@@ -74,6 +74,17 @@ export class AwsS3Service {
 				case AwsS3Format.JSON:
 					options.file = Buffer.from(JSON.stringify(options.file))
 					break
+				case AwsS3Format.Express_Multer_File: {
+					const multerFile = options.file as Express.Multer.File
+					if (multerFile?.buffer) {
+						options.file = multerFile.buffer
+					} else if (multerFile?.stream) {
+						options.file = multerFile.stream
+					} else {
+						throw new Error('Invalid Express.Multer.File: missing buffer/stream')
+					}
+					break
+				}
 			}
 		}
 

@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.example
+.npmrc
 
 # Created by .ignore support plugin (hsz.mobi)
 ### JetBrains template
