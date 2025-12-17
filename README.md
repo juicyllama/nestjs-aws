@@ -21,12 +21,14 @@ npm i @juicyllama/nestjs-aws
 
 1. Add AWS Credentials to your env file (required for all services)
 
-```bash
-# .env
 AWS_ACCESS_KEY_ID=
 AWS_SECRET_ACCESS_KEY=
-```
+AWS_DEFAULT_REGION | Optional | 
+AWS_ENDPOINT_URL | Optional | If you're using an alternative provider
 
 ### S3
 
 TODO: Instructions for setting up and using S3
+
+	AWS_S3_BUCKET_NAME!: string
+	AWS_S3_REGION - If the region is different from your primary AWS region
