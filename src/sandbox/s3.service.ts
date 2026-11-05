@@ -1,3 +1,4 @@
+/// <reference types="multer" />
 import { AwsS3Format, AwsS3Service } from '../modules/s3'
 import { Logger } from '@juicyllama/utils'
 import { Injectable, OnModuleInit } from '@nestjs/common'

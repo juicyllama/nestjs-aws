@@ -1,3 +1,4 @@
+/// <reference types="multer" />
 import { InjectConfig } from '../../config/config.provider'
 import { InjectS3 } from './aws.s3.constants'
 import { AwsS3Format } from './aws.s3.enums'
@@ -9,14 +10,12 @@ import {
 	ListObjectsCommand,
 	PutObjectCommandInput,
 	S3Client,
-	ServiceInputTypes,
-	ServiceOutputTypes,
 } from '@aws-sdk/client-s3'
 import { Hash } from '@aws-sdk/hash-node'
 import { Upload, Configuration } from '@aws-sdk/lib-storage'
 import { HttpRequest } from '@aws-sdk/protocol-http'
 import { getSignedUrl, S3RequestPresigner } from '@aws-sdk/s3-request-presigner'
-import { MiddlewareStack, SourceData } from '@aws-sdk/types'
+import { SourceData } from '@aws-sdk/types'
 import { parseUrl } from '@aws-sdk/url-parser'
 import { formatUrl } from '@aws-sdk/util-format-url'
 import { Logger } from '@juicyllama/utils'
@@ -94,12 +93,7 @@ export class AwsS3Service {
 		}
 
 		try {
-			this.s3Client.middlewareStack.use(
-				getApplyMd5BodyChecksumPlugin(this.s3Client.config) as any as MiddlewareStack<
-					ServiceInputTypes,
-					ServiceOutputTypes
-				>,
-			)
+			this.s3Client.middlewareStack.use(getApplyMd5BodyChecksumPlugin(this.s3Client.config))
 
 			if (!options.sizing) {
 				options.sizing = <Configuration>{
